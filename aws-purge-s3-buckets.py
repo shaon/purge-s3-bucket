@@ -10,13 +10,14 @@ parser.add_argument("--prefix", nargs='+', help="finds buckets with prefix, can 
 parser.add_argument("--ignore", action="store_true", help="ignore the buckets with the prefix.")
 parser.add_argument("--dry-run", action="store_true",
                     help="shows the buckets that will be deleted when run without this.")
+parser.add_argument("--debug", action="store_true", help="Debug mode.")
 args = parser.parse_args()
 
 RETRY = 6
 RETRY_WAIT = 10
 
 if not args.profile:
-    print("Profile not found!")
+    logging.error("Profile not found!")
     exit(1)
 
 session = boto3.Session(profile_name=args.profile)
@@ -32,7 +33,10 @@ def prefix_matched(bucket_name):
 
 
 def found_in_region(bucket_name):
-    region_name = s3.meta.client.get_bucket_location(Bucket=bucket_name)['LocationConstraint']
+    try:
+        region_name = s3client.get_bucket_location(Bucket=bucket_name)['LocationConstraint']
+    except s3client.exceptions.NoSuchBucket as e:
+        return False
 
     if region_name is None:
         region_name = "us-east-1"
@@ -100,9 +104,16 @@ def delete_bucket(bucket):
 
 
 def main():
-    for bucket in s3.buckets.all():
-        if is_valid(bucket.name):
-            delete_bucket(bucket)
+    logging.info("Getting the valid buckets to be purged...")
+    buckets = s3client.list_buckets()
+
+    if 'Buckets' not in buckets:
+        raise Exception("S3 doesn't have any buckets.")
+
+    for bucket in buckets['Buckets']:
+        bucket_name = bucket['Name']
+        if is_valid(bucket_name):
+            delete_bucket(s3.Bucket(bucket_name))
 
 
 if __name__ == "__main__":
