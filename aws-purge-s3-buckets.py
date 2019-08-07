@@ -2,6 +2,7 @@ import logging
 import boto3
 import argparse
 import time
+import multiprocessing
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--profile", help="name of the profile to use.", required=True)
@@ -117,11 +118,20 @@ def main():
 
     if 'Buckets' not in buckets:
         raise Exception("S3 doesn't have any buckets.")
-
+    start = time.time()
+    jobs = []
     for bucket in buckets['Buckets']:
         bucket_name = bucket['Name']
         if is_valid(bucket_name):
-            delete_bucket(s3.Bucket(bucket_name))
+            s3_Bucket = s3.Bucket(bucket_name)
+            p = multiprocessing.Process(target=delete_bucket, args=(s3_Bucket,))
+            p.start()
+            jobs.append(p)
+    for job in jobs:
+        job.join()
+
+    end = time.time()
+    print(f"Time elapsed: {end - start} seconds.")
 
 
 if __name__ == "__main__":
