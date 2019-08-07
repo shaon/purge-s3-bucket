@@ -8,8 +8,10 @@ parser.add_argument("--profile", help="name of the profile to use.", required=Tr
 parser.add_argument("--region", help="region name.")
 parser.add_argument("--prefix", nargs='+', help="finds buckets with prefix, can be a list e.g --prefix one two three.")
 parser.add_argument("--ignore", action="store_true", help="ignore the buckets with the prefix.")
-parser.add_argument("--dry-run", action="store_true",
-                    help="shows the buckets that will be deleted when run without this.")
+parser.add_argument("--exec",
+                    default=False,
+                    action="store_true",
+                    help="enable bucket deletion. Without this flag deleted buckets will only be displayed.")
 parser.add_argument("--debug", action="store_true", help="Debug mode.")
 args = parser.parse_args()
 
@@ -23,6 +25,12 @@ if not args.profile:
 session = boto3.Session(profile_name=args.profile)
 s3 = session.resource('s3')
 s3client = session.client('s3')
+
+if not args.exec:
+    print("Dry run. No buckets deleted, only displayed. Pass --exec flag for deletion.")
+else:
+    print("--exec flag found. Deleting buckets.")
+    time.sleep(2)  # give time to ctrl+z if needed.
 
 
 def prefix_matched(bucket_name):
@@ -76,7 +84,7 @@ def empty_bucket(bucket):
 
 
 def delete_bucket(bucket):
-    if not args.dry_run:
+    if args.exec:
         for i in range(RETRY):
             empty_bucket(bucket)
             response = s3client.list_objects_v2(Bucket=bucket.name)
